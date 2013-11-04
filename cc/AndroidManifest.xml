@@ -19,6 +19,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
         <activity
             android:name="com.admob.android.ads.AdMobActivity"
             android:configChanges="orientation|keyboard|keyboardHidden"
@@ -31,6 +33,7 @@
                 <action android:name="com.android.vending.INSTALL_REFERRER" />
             </intent-filter>
         </receiver>
+        -->
 
         <activity android:name=".ui.AudioRecorder" >
         </activity>
@@ -130,9 +133,11 @@
         </activity>
         <activity android:name=".ui.FeedbackHelp" >
         </activity>
+        <!--
         <activity
             android:name="com.google.ads.AdActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize" />
+            -->
         <activity android:name="com.jadn.cc.ui.OpmlImport" >
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
