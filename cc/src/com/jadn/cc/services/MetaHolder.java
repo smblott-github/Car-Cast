@@ -24,9 +24,13 @@ public class MetaHolder {
 	private List<MetaFile> metas = new ArrayList<MetaFile>();
 
 	public MetaHolder(Context context) {
-        this.context = context;
-        this.config = new Config(context);
-		loadMeta();
+        	this(context, null);
+	}
+
+	public MetaHolder(Context context, File current) {
+        	this.context = context;
+        	this.config = new Config(context);
+		loadMeta(current);
 	}
 
 	public void delete(int i) {
@@ -47,8 +51,11 @@ public class MetaHolder {
 	}
 
 	/* Really a part of the constructor -- assumes "metas" is empty */
-	private void loadMeta() {
-		File[] files = config.getPodcastsRoot().listFiles();
+	private void loadMeta(File current) {
+	String currentName = current == null ? null : current.getName();
+        int currentIndex = -1;
+        boolean priorityFileAddedToOrder = false;
+	File[] files = config.getPodcastsRoot().listFiles();
         File order = config.getPodcastRootPath("podcast-order.txt");
 
         if (files == null)
@@ -63,12 +70,47 @@ public class MetaHolder {
 					File file = config.getPodcastRootPath(line);
 					if (file.exists()) {
 						metas.add(new MetaFile(file));
+                                                if ( currentName != null && currentName.equals(file.getName()) )
+                                                {
+                                                   currentIndex = metas.size() - 1;
+	                                           Log.d("CarCast", "currentIndex: " + currentIndex);
+                                                }
 					}
 				}
 			} catch (IOException e) {
 				Log.e("CarCast", "reading order file", e);
 			}
 		}
+
+                if ( 0 <= currentIndex && currentIndex < metas.size() )
+                {
+                   // We've already encountered the currently-playing file;
+                   // currentIndex is its position.
+                   // assert 0 <= currentIndex;
+                   // assert currentIndex < metas.size();
+                   String prev, curr;
+                   do
+                   {
+                      currentIndex += 1;
+                      prev = metas.get(currentIndex - 1).getBaseFilename();
+                      curr = metas.get(currentIndex).getBaseFilename();
+                   } while ( currentIndex < metas.size() && curr.equals(prev) );
+                   // currentIndex is now the index *after* the
+                   // currently-playing podcast file and any following priority
+                   // podcasts.
+                   // assert 1 <= currentIndex;
+                   // assert currentIndex <= metas.size();
+                }
+
+                // Fail safe.
+                // The code above looks good to me.  I've tested it in various ways.
+                // However, if there are any errors, it could result in incorrect indexing
+                // into the `metas` array, which would crash the app.
+                // So, just to be safe for the time being, let's leave some code here that
+                // catches any problems.
+                if ( currentIndex < 1 || metas.size() < currentIndex )
+                   // SHOULD NOT HAPPEN!
+                   currentIndex = -1;
 
 		// Look for "Found Files" -- not in ordered list... but sitting in the directory
 		ArrayList<File> foundFiles = new ArrayList<File>();
@@ -79,22 +121,39 @@ public class MetaHolder {
 			}
 			if (file.getName().endsWith(".mp3") || file.getName().endsWith(".3gp") || file.getName().endsWith(".ogg")) {
 				if (!alreadyHas(file)) {
-					foundFiles.add(file);
+                                        if ( 0 <= currentIndex && isPriority(file) )
+                                        {
+                                           // The currently-playing podcast is in "podcast-order.txt", so insert the new file
+                                           // immediately after it.
+	                                   Log.d("CarCast", "adding: " + currentIndex + " " + file.getName());
+                                           metas.add(currentIndex++, new MetaFile(file));
+                                           priorityFileAddedToOrder = true;
+                                        }
+                                        else
+                                           // Just append the new file.  If this is from a priority podcast, it'll sort
+                                           // into the right place anyway.
+                                           foundFiles.add(file);
 				}
 			}
 		}
-		// order the found files by time
+		// Order the found files by file name.
 		Collections.sort(foundFiles, new Comparator<File>() {
 			@Override
 			public int compare(File object1, File object2) {
-				return new Long(object1.lastModified()).compareTo(new Long(object2.lastModified()));
+				return object1.getName().compareTo(object2.getName());
 			}
 		});
 		Log.i("carcast", "loadMeta found:"+foundFiles.size()+" meta:"+metas.size());
 		for (File file : foundFiles) {
-			metas.add(new MetaFile(file));
+                     metas.add(new MetaFile(file));
 		}
 
+                // We need to save the order if any priority files have been inserted into the ordered
+                // part of the playlist.  If we don't, then those priority files may appear to jump around
+                // in the playlist. For example, if we select a new file for playback and then stop and restart
+                // the app, then the priority files will jump to after the newly-playing file.
+                if ( priorityFileAddedToOrder )
+                   saveOrder();
 	}
 
 	boolean alreadyHas(File file) {
@@ -196,7 +255,19 @@ public class MetaHolder {
 		} catch (Exception e) {
 			Log.e("carcast", "saving order", e);
 		}
-
 	}
 
+        // IMPORTANT:
+        // The regular expression used here *must* match the file naming scheme used in
+        // DownloadHelper.downloadNewPodCasts().
+        private boolean isPriority(File file)
+        {
+           String pattern = "^\\d+:\\d\\d:\\d+\\..*"; // E.g. "YYYY:00:XXXX.mp3"
+           boolean priority = file.getName().matches(pattern);
+	   Log.d("CarCast", "priority: " + priority + " " + file.getName());
+           return priority;
+        }
+
 }
+
+// vim: set noet ci pi sts=0 sw=4 ts=4
