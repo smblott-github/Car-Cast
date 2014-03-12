@@ -13,6 +13,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
@@ -65,7 +66,7 @@ public class Subscriptions extends BaseActivity {
 			return;
 		}
 
-		listAdapter = new SimpleAdapter(this, subscriptions, R.layout.main_item_two_line_row, new String[] { "name", "enabled" },
+		listAdapter = new SimpleAdapter(this, subscriptions, R.layout.main_item_two_line_row2, new String[] { "name", "enabled" },
 				new int[] { R.id.text1, R.id.text2 });
 		listView.setAdapter(listAdapter);
 	}
@@ -142,7 +143,9 @@ public class Subscriptions extends BaseActivity {
 	@Override
 	public boolean onMenuItemSelected(int featureId, MenuItem item) {
 		if (item.getItemId() == R.id.addSubscription) {
-			startActivityForResult(new Intent(this, SubscriptionEdit.class), Integer.MAX_VALUE);
+			Intent addIntent = new Intent(this, SubscriptionEdit.class);
+			addIntent.putExtra("focus", "This value is ignored; only the presence of the key matters.");
+			startActivityForResult(addIntent, Integer.MAX_VALUE);
 			return true;
 		}
 		if (item.getItemId() == R.id.deleteAllSubscriptions) {
@@ -208,12 +211,11 @@ public class Subscriptions extends BaseActivity {
 	public void exportOpml() {
 		File tempFile = null;
 		try {
-			tempFile = File.createTempFile("carcast", ".opml");
-			tempFile = new File(tempFile.getParentFile(), "carcast.opml");
-			tempFile.delete();
-			FileOutputStream fileOutputStream = new FileOutputStream(tempFile);			
-			contentService.exportOPML(fileOutputStream);
-			fileOutputStream.close();
+
+            tempFile = new File(Environment.getExternalStorageDirectory(),"/carcast.opml");
+            FileOutputStream opmlFile = new FileOutputStream(tempFile);
+			contentService.exportOPML(opmlFile);
+            opmlFile.close();
 		} catch (Exception ex) {
 			// Do a toast...
 			Util.toast(this, "Problem creating temporary file\n"+ex.getMessage());
